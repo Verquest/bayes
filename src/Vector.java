@@ -3,8 +3,8 @@ import java.util.Collection;
 
 public class Vector implements Comparable<Vector>{
     public ArrayList<Double> vals;
-    public boolean isActivationVector = false;
-
+    public ArrayList<String> ettiquettes = new ArrayList<String>();
+    public String activationString;
     public Vector(double... values) {
         vals = new ArrayList<>();
         for(double d: values)
@@ -21,9 +21,7 @@ public class Vector implements Comparable<Vector>{
         for(double d: v.vals)
             vals.add(d);
     }
-    public void setActivation(boolean b) {
-        isActivationVector = b;
-    }
+
     public void normalize(){
         ArrayList<Double> valsSquared = new ArrayList<>(vals);
 

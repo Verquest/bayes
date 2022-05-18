@@ -6,20 +6,25 @@ public class Main {
         ArrayList<Row> rows = new ArrayList<>();
         Loader loader = new Loader();
         rows = loader.load("src/train.txt");
-        String activationEttiquette = rows.get(0).getEttiquette();
         ArrayList<TreeSet<String>> uniqueAttrs = getEttiquetteCount(rows);
         ArrayList<Integer> attrCount = getAttributeCount(uniqueAttrs);
         ArrayList<HashMap<String, Integer>> attributeNumericValues = getAttributeNumericValues(uniqueAttrs);
         System.out.println(attrCount);
         Row.setMaxAttributeValues(attrCount);
-        ArrayList<Vector> vectors = changeRowToVector(rows, attributeNumericValues, activationEttiquette);
-        Bayes bayes = new Bayes(rows.get(0).getAttributeCount(), vectors, attrCount);
+        ArrayList<Vector> vectors = changeRowToVector(rows, attributeNumericValues);
+        ArrayList<String> uniqueEttiquettes = new ArrayList<String>();
+        for (int i = 0; i < vectors.size(); i++) {
+            if (!uniqueEttiquettes.contains(vectors.get(i).activationString)) {
+                uniqueEttiquettes.add(vectors.get(i).activationString);
+            }
+        }
+        HashMap<String, Double> activationEttiquettesCount = ettiquetteCount(rows, uniqueEttiquettes);
+        Bayes bayes = new Bayes(rows.get(0).getAttributeCount(), vectors, attrCount, uniqueAttrs, activationEttiquettesCount);
         bayes.train();
         rows = loader.load("src/test.txt");
-        ArrayList<Vector> testVectors = changeRowToVector(rows, attributeNumericValues, activationEttiquette);
+        ArrayList<Vector> testVectors = changeRowToVector(rows, attributeNumericValues);
         bayes.test(testVectors);
         //manual input
-        System.out.println("Etykieta aktywacji: " + activationEttiquette);
         while(true) {
             ArrayList<String> attributes = manualInput(rows.get(0).getAttributeCount());
             Vector vector = new Vector();
@@ -33,17 +38,23 @@ public class Main {
     }
 
     public static ArrayList<String> manualInput(int size){
-        int valCount = 0;
-        Scanner scanner = new Scanner(System.in);
-        ArrayList<String> attributes = new ArrayList<>();
 
-        while(valCount < size){
-            System.out.println("Enter the " + valCount + "th attribute: ");
-            String attr = scanner.nextLine();
-            attributes.add(attr);
-            valCount++;
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter the line attribute: ");
+        String attr = scanner.nextLine();
+        System.out.println(attr);
+        return new ArrayList<>(Arrays.asList(attr.split(",")));
+    }
+
+    public static HashMap<String, Double> ettiquetteCount(ArrayList<Row> rows, ArrayList<String> uniqueEttiquettes) {
+        HashMap<String, Double> ettiquetteCount = new HashMap<>();
+        for(String ettiquette : uniqueEttiquettes) {
+            ettiquetteCount.put(ettiquette, 0.0);
         }
-        return attributes;
+        for (Row row : rows) {
+            ettiquetteCount.put(row.getEttiquette(), ettiquetteCount.get(row.getEttiquette()) + 1);
+        }
+        return ettiquetteCount;
     }
     public static ArrayList<HashMap<String, Integer>> getAttributeNumericValues(ArrayList<TreeSet<String>> uniqueAttrs) {
         ArrayList<HashMap<String, Integer>> attributeNumericValues = new ArrayList<>();
@@ -58,14 +69,13 @@ public class Main {
         }
         return attributeNumericValues;
     }
-    public static ArrayList<Vector> changeRowToVector(ArrayList<Row> rows, ArrayList<HashMap<String, Integer>> attributeNumericValues, String activationEttiquette) {
+    public static ArrayList<Vector> changeRowToVector(ArrayList<Row> rows, ArrayList<HashMap<String, Integer>> attributeNumericValues) {
         ArrayList<Vector> vectors = new ArrayList<>();
         for (Row row : rows) {
             Vector vector = new Vector();
+            vector.activationString = row.getEttiquette();
             for (int i = 0; i < row.getAttributeCount(); i++) {
-                if (row.getEttiquette().equals(activationEttiquette)) {
-                    vector.setActivation(true);
-                }
+                vector.ettiquettes.add(row.attributes.get(i));
                 vector.add(attributeNumericValues.get(i).get(row.getAttribute(i)));
             }
             vectors.add(vector);

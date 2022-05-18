@@ -1,20 +1,47 @@
-import java.util.ArrayList;
+import java.util.*;
 
 public class Bayes {
-    private ArrayList<ArrayList<Propability>> probabilities;
+    private ArrayList<Propability> probabilities;
     ArrayList<Vector> vectors;
     private int size;
+    private int uniqueEttqsCount = 0;
+    private ArrayList<String> uniqueEttiquettes;
+    private HashMap<String, Double> uniqueEttiquettesCount;
 
-    public Bayes(int size, ArrayList<Vector> vectors, ArrayList<Integer> sizes) {
+    public Bayes(int size, ArrayList<Vector> vectors, ArrayList<Integer> uniqueAttrCountPerColumn, ArrayList<TreeSet<String>> uniqueAttrs, HashMap<String, Double> uniqueEttiquettesCount) {
         this.size = size;
         this.vectors = vectors;
-        probabilities = new ArrayList<ArrayList<Propability>>();
-        for (int i = 0; i < size; i++) {
-            probabilities.add(new ArrayList<Propability>());
-            for (int j = 0; j < sizes.get(i); j++) {
-                probabilities.get(i).add(new Propability(vectors.size(), (double)j, true));
-                probabilities.get(i).add(new Propability(vectors.size(), (double)j, false));
+        this.uniqueEttiquettesCount = uniqueEttiquettesCount;
+        //get unique ettiquettes from vectors
+        uniqueEttiquettes = new ArrayList<String>();
+        for (int i = 0; i < vectors.size(); i++) {
+            if (!uniqueEttiquettes.contains(vectors.get(i).activationString)) {
+                uniqueEttiquettes.add(vectors.get(i).activationString);
             }
+        }
+        uniqueEttqsCount = uniqueEttiquettes.size();
+        probabilities = new ArrayList<Propability>();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < uniqueAttrCountPerColumn.get(i); j++) {
+                for (String ettq : uniqueEttiquettes) {
+                    probabilities.add(new Propability(vectors.size(), (double) j, uniqueAttrs.get(i).toArray(new String[0])[j], i, ettq));
+                }
+            }
+        }
+        //wygladzanie
+        boolean isAnyZero = false;
+        for (Propability propability : probabilities) {
+
+                if (propability.getCount() == 0) {
+                    isAnyZero = true;
+                }
+
+        }
+        if (isAnyZero) {
+            for (Propability propability : probabilities) {
+                propability.increment();
+            }
+
         }
     }
 
@@ -23,55 +50,68 @@ public class Bayes {
         int count = testVectors.size();
         for (int t = 0; t < testVectors.size(); t++) {
             Vector vector = testVectors.get(t);
-            ArrayList<Double> activationProbabilities = new ArrayList<Double>();
-            ArrayList<Double> nonActivationProbabilities = new ArrayList<Double>();
-            for (int i = 0; i < size; i++) {
-                for (int j = 0; j < probabilities.get(i).size(); j++) {
-                    Propability p = probabilities.get(i).get(j);
-                    if (p.getValue() == vector.get(i)) {
-                        if (p.isActivated()) {
-                            activationProbabilities.add(p.getProbability());
-                        } else {
-                            nonActivationProbabilities.add(p.getProbability());
+            HashMap<String, Double> props = new HashMap<String, Double>();
+
+            for (String ettq : uniqueEttiquettes) {
+                double p = 1;
+                p*=uniqueEttiquettesCount.get(ettq);
+                for (int i = 0; i < size; i++) {
+                    //find the prop to get val from
+                    for (Propability prop : probabilities) {
+                        if (prop.getAssociatedCol() == i && prop.getValue() == (int) vector.get(i) && prop.getActivationEttiquette().equals(ettq)) {
+                            p *= prop.getProbability();
+                            break;
                         }
                     }
                 }
+                props.put(ettq, p);
             }
-            double activationProbability = 0;
-            double nonActivationProbability = 0;
-            activationProbability = activationProbabilities.stream().reduce(1.0, (a, b) -> a * b);
-            nonActivationProbability = nonActivationProbabilities.stream().reduce(1.0, (a, b) -> a * b);
-            if (activationProbability > nonActivationProbability) {
-                if (vector.isActivationVector) {
-                    correct++;
+
+            //get max ettiquette from propabilites
+            String maxEttiquette = "";
+            double maxProbability = 0;
+            for (String etq : props.keySet()) {
+                System.out.println("Propability for: " + etq + " is: " + props.get(etq));
+                if (props.get(etq) > maxProbability) {
+                    maxProbability = props.get(etq);
+                    maxEttiquette = etq;
                 }
-            }else if(!vector.isActivationVector){
+            }
+            if (maxEttiquette.equals(vector.activationString)) {
                 correct++;
             }
-            if(count == 1){
-                System.out.println("Uzyskana: " + (activationProbability>nonActivationProbability));
+            if (count == 1) {
+                System.out.println("Uzyskana: " + maxEttiquette);
             }
         }
-        if(count!=1)
+        if (count != 1) {
             System.out.println("Correct: " + correct + " out of " + count);
+            for (Propability propability : probabilities) {
+                System.out.println("Column: " + propability.getAssociatedCol() +
+                        ", ettiquette: " + propability.getEttiquette() +
+                        " | " + propability.getActivationEttiquette() +
+                        ", propability: " + propability.getProbability() +
+                        ", count: " + propability.getCount() +
+                        ", total: " + propability.getTotal());
+            }
+        }
     }
 
     public void train() {
         for (int i = 0; i < vectors.size(); i++) {
-            boolean isActivated = vectors.get(i).isActivationVector;
+            String ettq = vectors.get(i).activationString;
             for (int j = 0; j < size; j++) {
-                incrementProbability(j, (int)vectors.get(i).get(j), isActivated);
+                incrementProbability(j,  vectors.get(i).ettiquettes.get(j), ettq);
             }
         }
     }
-    private void incrementProbability(int index, int value, boolean isActivated) {
-        for (int i = 0; i < probabilities.get(index).size(); i++) {
-            Propability p = probabilities.get(index).get(i);
-            if (p.getValue() == value && p.isActivated() == isActivated) {
+
+    private void incrementProbability(int index, String ettiquette, String activationEttiquette) {
+        Propability p = null;
+        for (int i = 0; i < probabilities.size(); i++) {
+            p = probabilities.get(i);
+            if (p.getAssociatedCol() == index && p.getEttiquette().equals(ettiquette) && p.getActivationEttiquette().equals(activationEttiquette)) {
                 p.increment();
-            }
-            if (p.getValue() == value && p.isActivated() != isActivated){
-                p.incrementTotal();
             }
         }
     }
